@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+* {
+  font-family: 'Urbanist', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(to bottom right, #0f172a, #1e293b);
+  }
+}
+
+@keyframes shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    #2563eb 0%,
+    #3b82f6 25%,
+    #60a5fa 50%,
+    #3b82f6 75%,
+    #2563eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shine 3s linear infinite;
+}
+
+.shine-effect:hover {
+  animation: shine 1.5s linear infinite;
+}
