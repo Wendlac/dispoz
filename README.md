@@ -269,7 +269,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## 👨‍💻 Auteur
 
-Créé avec ❤️ par [Votre Nom](https://github.com/votre-username)
+Créé avec ❤️ par [Orion design](https://github.com/orion-design)
 
 ---
 
