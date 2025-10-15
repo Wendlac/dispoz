@@ -108,7 +108,7 @@ function App() {
         <div className="text-center mb-12">
           <div className="flex flex-col items-center justify-center mb-6">
             <img 
-              src="/logo-with color.png" 
+              src="logo-with color.png" 
               alt="Dispoz" 
               className="w-32 h-32 object-contain"
             />
