@@ -106,13 +106,12 @@ function App() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl">
-              <Palette className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Dispoz
-            </h1>
+          <div className="flex flex-col items-center justify-center mb-6">
+            <img 
+              src="/logo-with color.png" 
+              alt="Dispoz" 
+              className="w-32 h-32 object-contain"
+            />
           </div>
           <p className="text-lg text-slate-600">
             Extrayez une palette de couleurs depuis n'importe quelle image
