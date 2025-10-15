@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import ColorThief from 'colorthief';
-import { Palette, Upload, Copy, Check, X } from 'lucide-react';
+import { Upload, Copy, Check, X } from 'lucide-react';
 
 interface Color {
   rgb: [number, number, number];
