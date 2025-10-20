@@ -1,11 +1,16 @@
 import { useState, useCallback } from 'react';
 import ColorThief from 'colorthief';
-import { Upload, Copy, Check, X } from 'lucide-react';
+import { Upload, Copy, Check, X, Palette, Layout } from 'lucide-react';
+
+type ClassificationType = 'graphic' | 'ui';
+type UiColorRole = 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'neutral';
 
 interface Color {
   rgb: [number, number, number];
   hex: string;
   hsl: string;
+  role?: UiColorRole | string;
+  [Symbol.iterator](): Iterator<number>;
 }
 
 function App() {
@@ -13,6 +18,16 @@ function App() {
   const [colors, setColors] = useState<Color[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string>('');
+  const [classificationType, setClassificationType] = useState<ClassificationType>('graphic');
+  
+  // État pour la personnalisation de la carte
+  const [cardCustomization, setCardCustomization] = useState({
+    backgroundColor: '#ffffff',
+    textColor: '#1f2937',
+    buttonColor: '#3b82f6',
+    buttonTextColor: '#ffffff',
+    customizing: false
+  });
 
   // Conversion RGB vers HEX
   const rgbToHex = (r: number, g: number, b: number): string => {
@@ -37,6 +52,28 @@ function App() {
     return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
   };
 
+  // Classification des couleurs pour le design UI
+  const classifyUiColors = useCallback((colorsToClassify: Color[]): Color[] => {
+    if (colorsToClassify.length === 0) return [];
+    
+    // Trier les couleurs par luminosité
+    const sortedByLuminance = [...colorsToClassify].sort((a, b) => {
+      const [r1, g1, b1] = a.rgb;
+      const [r2, g2, b2] = b.rgb;
+      const luminance1 = (0.299 * r1 + 0.587 * g1 + 0.114 * b1) / 255;
+      const luminance2 = (0.299 * r2 + 0.587 * g2 + 0.114 * b2) / 255;
+      return luminance2 - luminance1; // Du plus clair au plus foncé
+    });
+
+    // Définir les rôles en fonction de la position dans la palette triée
+    const uiRoles: UiColorRole[] = ['primary', 'secondary', 'accent', 'success', 'warning', 'error'];
+    
+    return sortedByLuminance.map((color, index) => ({
+      ...color,
+      role: uiRoles[index] || 'neutral'
+    }));
+  }, []);
+
   // Extraction des couleurs
   const extractColors = useCallback(async (dataUrl: string) => {
     const img = new Image();
@@ -49,16 +86,30 @@ function App() {
     });
 
     const colorThief = new ColorThief();
-    const palette = colorThief.getPalette(img, 6);
+    const palette = colorThief.getPalette(img, 6) as Array<[number, number, number]>;
     
-    const extractedColors: Color[] = palette.map(([r, g, b]) => ({
-      rgb: [r, g, b],
-      hex: rgbToHex(r, g, b),
-      hsl: rgbToHsl(r, g, b),
-    }));
+    let extractedColors = palette.map((colorArray) => {
+      const [r, g, b] = colorArray;
+      const color = {
+        rgb: [r, g, b] as [number, number, number],
+        hex: rgbToHex(r, g, b),
+        hsl: rgbToHsl(r, g, b),
+        [Symbol.iterator]: function*() {
+          yield this.rgb[0];
+          yield this.rgb[1];
+          yield this.rgb[2];
+        }
+      };
+      return color as Color;
+    });
+    
+    // Appliquer la classification si nécessaire
+    if (classificationType === 'ui') {
+      extractedColors = classifyUiColors(extractedColors);
+    }
     
     setColors(extractedColors);
-  }, []);
+  }, [classificationType, classifyUiColors]);
 
   // Gestion de l'upload
   const handleFile = useCallback((file: File) => {
@@ -89,6 +140,19 @@ function App() {
     if (file) handleFile(file);
   }, [handleFile]);
 
+  // Gestion du changement de type de classification
+  const handleClassificationChange = (type: ClassificationType) => {
+    setClassificationType(type);
+    if (colors.length > 0) {
+      if (type === 'ui') {
+        setColors(prevColors => classifyUiColors(prevColors));
+      } else {
+        // Réinitialiser les rôles pour le mode graphique
+        setColors(prevColors => prevColors.map(({ role, ...rest }) => rest as Color));
+      }
+    }
+  };
+
   // Copier dans le presse-papier
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -101,21 +165,88 @@ function App() {
     return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5 ? '#000' : '#fff';
   };
 
+  // Traductions des rôles UI
+  const getUiRoleLabel = (role?: string): string => {
+    const translations: Record<string, string> = {
+      'primary': 'Primaire',
+      'secondary': 'Secondaire',
+      'accent': 'Accent',
+      'success': 'Succès',
+      'warning': 'Avertissement',
+      'error': 'Erreur',
+      'neutral': 'Neutre'
+    };
+    return role ? translations[role] || role : '';
+  };
+
+  // Gestion du changement des couleurs de personnalisation
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCardCustomization(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Bascher le mode de personnalisation
+  const toggleCustomization = () => {
+    setCardCustomization(prev => ({
+      ...prev,
+      customizing: !prev.customizing
+    }));
+  };
+
+  // Appliquer une couleur de la palette à un élément
+  const applyColor = (colorHex: string, target: keyof typeof cardCustomization) => {
+    setCardCustomization(prev => ({
+      ...prev,
+      [target]: colorHex
+    }));
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex flex-col items-center justify-center mb-6">
+        <div className="text-center mb-8 md:mb-12">
+          <div className="flex flex-col items-center justify-center mb-4 md:mb-6">
             <img 
-              src="logo-with color.png" 
+              src="src/assets/logo-with color-bg.png" 
               alt="Dispoz" 
-              className="w-32 h-32 object-contain"
+              className="w-24 h-24 md:w-32 md:h-32 object-contain"
             />
           </div>
-          <p className="text-lg text-slate-600">
+          <p className="text-base md:text-lg text-slate-600">
             Extrayez une palette de couleurs depuis n'importe quelle image
           </p>
+        </div>
+
+        {/* Sélecteur de classification */}
+        <div className="flex justify-center mb-6">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              onClick={() => handleClassificationChange('graphic')}
+              className={`px-4 py-2 text-sm font-medium rounded-md flex items-center ${
+                classificationType === 'graphic' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Palette className="w-4 h-4 mr-2" />
+              Graphisme
+            </button>
+            <button
+              onClick={() => handleClassificationChange('ui')}
+              className={`px-4 py-2 text-sm font-medium rounded-md flex items-center ${
+                classificationType === 'ui' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Layout className="w-4 h-4 mr-2" />
+              UI Design
+            </button>
+          </div>
         </div>
 
         {/* Zone d'upload */}
@@ -170,41 +301,193 @@ function App() {
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Palette extraite</h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                    {colors.map((color, idx) => (
-                      <div key={idx} className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
-                        <div className="h-24" style={{ backgroundColor: color.hex }} />
-                        <div className="p-3 space-y-2">
-                          {[
-                            { label: 'HEX', value: color.hex },
-                            { label: 'RGB', value: `rgb(${color.rgb.join(', ')})` },
-                            { label: 'HSL', value: color.hsl },
-                          ].map(({ label, value }) => (
-                            <div key={label} className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
-                              <div>
-                                <span className="text-[10px] font-medium text-slate-500">{label}</span>
-                                <code className="block text-xs font-mono text-slate-700 truncate">{value}</code>
+                    {colors.map((color, idx) => {
+                      const textColor = getTextColor(...color.rgb);
+                      const displayRole = classificationType === 'ui' && color.role;
+                      
+                      return (
+                        <div key={idx} className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                          {displayRole && (
+                            <div 
+                              className="h-2 w-full" 
+                              style={{ backgroundColor: color.hex }}
+                            />
+                          )}
+                          <div 
+                            className={`h-20 ${displayRole ? 'mt-0' : 'h-24'}`} 
+                            style={{ 
+                              backgroundColor: color.hex,
+                              color: textColor,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold',
+                              fontSize: displayRole ? '0.75rem' : '0',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              textShadow: textColor === '#fff' ? '0 1px 2px rgba(0,0,0,0.2)' : '0 1px 2px rgba(255,255,255,0.2)'
+                            }}
+                          >
+                            {displayRole && getUiRoleLabel(color.role)}
+                          </div>
+                          <div className="p-3 space-y-2">
+                            {[
+                              { label: 'HEX', value: color.hex },
+                              { label: 'RGB', value: `rgb(${color.rgb.join(', ')})` },
+                              { label: 'HSL', value: color.hsl },
+                            ].map(({ label, value }) => (
+                              <div key={label} className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
+                                <div>
+                                  <span className="text-[10px] font-medium text-slate-500">{label}</span>
+                                  <code className="block text-xs font-mono text-slate-700 truncate">{value}</code>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(value)}
+                                  className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                                >
+                                  {copiedCode === value ? (
+                                    <Check className="w-3.5 h-3.5 text-green-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                  )}
+                                </button>
                               </div>
-                              <button
-                                onClick={() => copyToClipboard(value)}
-                                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-                              >
-                                {copiedCode === value ? (
-                                  <Check className="w-3.5 h-3.5 text-green-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                )}
-                              </button>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Preview UI */}
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Aperçu de la palette</h2>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-slate-800">Aperçu de la palette</h2>
+                    <button
+                      onClick={toggleCustomization}
+                      className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-blue-200 transition-colors"
+                    >
+                      <Palette className="w-4 h-4" />
+                      {cardCustomization.customizing ? 'Masquer les options' : 'Personnaliser'}
+                    </button>
+                  </div>
+                  
+                  {cardCustomization.customizing && (
+                    <div className="bg-white rounded-2xl p-6 mb-6 shadow-md">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-4">Personnalisation</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Couleur de fond</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              name="backgroundColor"
+                              value={cardCustomization.backgroundColor}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded cursor-pointer"
+                            />
+                            <div className="flex-1 grid grid-cols-4 gap-1">
+                              {colors.slice(0, 4).map((color) => (
+                                <button
+                                  key={color.hex}
+                                  className="h-8 rounded-md border border-gray-200"
+                                  style={{ backgroundColor: color.hex }}
+                                  onClick={() => applyColor(color.hex, 'backgroundColor')}
+                                  title={`Appliquer ${color.hex}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Couleur du texte</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              name="textColor"
+                              value={cardCustomization.textColor}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded cursor-pointer"
+                            />
+                            <div className="flex-1 grid grid-cols-4 gap-1">
+                              {colors.slice(0, 4).map((color) => (
+                                <button
+                                  key={`text-${color.hex}`}
+                                  className="h-8 rounded-md border border-gray-200"
+                                  style={{ backgroundColor: color.hex }}
+                                  onClick={() => applyColor(color.hex, 'textColor')}
+                                  title={`Appliquer ${color.hex}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Couleur du bouton</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              name="buttonColor"
+                              value={cardCustomization.buttonColor}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded cursor-pointer"
+                            />
+                            <div className="flex-1 grid grid-cols-4 gap-1">
+                              {colors.slice(0, 4).map((color) => (
+                                <button
+                                  key={`btn-${color.hex}`}
+                                  className="h-8 rounded-md border border-gray-200"
+                                  style={{ backgroundColor: color.hex }}
+                                  onClick={() => applyColor(color.hex, 'buttonColor')}
+                                  title={`Appliquer ${color.hex}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Couleur du texte du bouton</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              name="buttonTextColor"
+                              value={cardCustomization.buttonTextColor}
+                              onChange={handleColorChange}
+                              className="w-10 h-10 rounded cursor-pointer"
+                            />
+                            <div className="flex-1 grid grid-cols-4 gap-1">
+                              <button
+                                className="h-8 rounded-md border border-gray-200 bg-white"
+                                onClick={() => applyColor('#ffffff', 'buttonTextColor')}
+                                title="Blanc"
+                              />
+                              <button
+                                className="h-8 rounded-md border border-gray-200 bg-gray-900"
+                                onClick={() => applyColor('#111827', 'buttonTextColor')}
+                                title="Noir"
+                              />
+                              {colors.slice(0, 2).map((color) => (
+                                <button
+                                  key={`btn-text-${color.hex}`}
+                                  className="h-8 rounded-md border border-gray-200"
+                                  style={{ backgroundColor: getTextColor(...color.rgb) }}
+                                  onClick={() => applyColor(getTextColor(...color.rgb), 'buttonTextColor')}
+                                  title={`Contraste de ${color.hex}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Boutons */}
                     <div className="bg-white rounded-3xl p-6 shadow-lg">
@@ -225,48 +508,33 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Card */}
+                    {/* Card personnalisable */}
                     <div
-                      className="rounded-3xl p-6 shadow-lg"
-                      style={{ backgroundColor: colors[0].hex }}
+                      className="rounded-3xl p-6 shadow-lg transition-colors duration-300"
+                      style={{ 
+                        backgroundColor: cardCustomization.backgroundColor,
+                        color: cardCustomization.textColor
+                      }}
                     >
                       <h3
                         className="text-lg font-semibold mb-3"
-                        style={{ color: getTextColor(...colors[0].rgb) }}
                       >
-                        Card colorée
+                        Titre de la carte
                       </h3>
                       <p
                         className="mb-4 opacity-90"
-                        style={{ color: getTextColor(...colors[0].rgb) }}
                       >
-                        Exemple de texte sur un fond coloré avec contraste automatique.
+                        Ceci est un exemple de texte qui s'affiche sur la carte. Vous pouvez personnaliser les couleurs à votre guise.
                       </p>
                       <button
-                        className="px-4 py-2 rounded-full font-medium"
+                        className="px-4 py-2 rounded-full font-medium transition-colors hover:opacity-90"
                         style={{
-                          backgroundColor: colors[1]?.hex || '#fff',
-                          color: getTextColor(...(colors[1]?.rgb || [255, 255, 255])),
+                          backgroundColor: cardCustomization.buttonColor,
+                          color: cardCustomization.buttonTextColor
                         }}
                       >
-                        Action
+                        Bouton d'action
                       </button>
-                    </div>
-
-                    {/* Texte */}
-                    <div className="bg-white rounded-3xl p-6 shadow-lg md:col-span-2">
-                      <h3 className="text-lg font-semibold text-slate-700 mb-4">Typographie</h3>
-                      <div className="space-y-2">
-                        {colors.slice(0, 4).map((color, idx) => (
-                          <p
-                            key={idx}
-                            className="text-lg font-medium"
-                            style={{ color: color.hex }}
-                          >
-                            Exemple de texte avec la couleur {idx + 1}
-                          </p>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
