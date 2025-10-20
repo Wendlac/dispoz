@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react';
 import ColorThief from 'colorthief';
 import { Upload, Copy, Check, X, Palette, Layout } from 'lucide-react';
 
+// URL directe du logo sur GitHub
+const logoUrl = 'https://raw.githubusercontent.com/Wendlac/dispoz/main/public/logo-with%20color.png';
+
 type ClassificationType = 'graphic' | 'ui';
 type UiColorRole = 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'neutral';
 
@@ -211,7 +214,7 @@ function App() {
         <div className="text-center mb-8 md:mb-12">
           <div className="flex flex-col items-center justify-center mb-4 md:mb-6">
             <img 
-              src="src/assets/logo-with color-bg.png" 
+              src={logoUrl} 
               alt="Dispoz" 
               className="w-24 h-24 md:w-32 md:h-32 object-contain"
             />
